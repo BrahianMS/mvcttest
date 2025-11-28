@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ✅ Logging mejorado
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
-builder.Logging.SetMinimumLevel(LogLevel.Debug);
+builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // ✅ CORS configurado desde variables de entorno
 var allowedOrigins = builder.Configuration["CORS_ORIGINS"]?.Split(',') 
@@ -29,24 +29,40 @@ builder.Services.AddCors(options =>
 });
 
 // ✅ Registro de servicios
-builder.Services.AddInfrastructureServices(); // Ahora usa RabbitMQEventBus
+builder.Services.AddInfrastructureServices();
 builder.Services.AddApplicationServices();
 
 var app = builder.Build();
 
 app.UseCors("AllowFrontend");
 
-// ✅ Event Bus - Eliminar suscripción (no se usa en productor)
-// El consumer Java manejará el consumo
+// ✅ HEALTH CHECK MEJORADO
+app.MapGet("/api/v1/health", (ILogger<Program> logger) => 
+{
+    try
+    {
+        logger.LogInformation("💚 Health check OK vía /api/v1/health");
+        return Results.Ok(new { 
+            status = "Healthy", 
+            service = "csharp-producer",
+            timestamp = DateTime.UtcNow
+        });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Health check failed");
+        return Results.Problem("Service unhealthy");
+    }
+});
 
-// ✅ ENDPOINTS
-app.MapPost("/publish", async (PublishRequest req, IEventBus bus, ILogger<Program> logger) =>
+// ✅ ENDPOINT DE PUBLICACIÓN
+app.MapPost("/api/v1/publish", async (PublishRequest req, IEventBus bus, ILogger<Program> logger) =>
 {
     try
     {
         var evt = new MessagePublishedEvent(
             EventId: Guid.NewGuid().ToString(),
-            Timestamp: DateTime.UtcNow.ToString("o"), // ISO 8601
+            Timestamp: DateTime.UtcNow.ToString("o"),
             TenantId: "default-tenant",
             Message: req.Message
         );
@@ -56,7 +72,7 @@ app.MapPost("/publish", async (PublishRequest req, IEventBus bus, ILogger<Progra
 
         logger.LogInformation("✅ Mensaje publicado: {EventId}", evt.EventId);
 
-        return Results.Accepted("/publish", new
+        return Results.Accepted("/api/v1/publish", new
         {
             published = true,
             eventId = evt.EventId,
@@ -71,18 +87,12 @@ app.MapPost("/publish", async (PublishRequest req, IEventBus bus, ILogger<Progra
     }
 });
 
-app.MapGet("/last", () =>
+app.MapGet("/api/v1/last", () =>
 {
     return Results.Json(new
     {
         message = MessageStore.LastMessage
     });
-});
-
-app.MapGet("/health", (ILogger<Program> logger) => 
-{
-    logger.LogInformation("💚 Health check OK");
-    return Results.Json(new { status = "Healthy", service = "csharp-producer" });
 });
 
 app.Run();

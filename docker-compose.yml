@@ -53,6 +53,8 @@ services:
       RMQ_USER: ${RABBITMQ_DEFAULT_USER}
       RMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
       CORS_ORIGINS: ${CORS_ORIGINS}
+    ports:
+      - "8080:8080"  # ✅ AGREGAR ESTA LÍNEA
     networks:
       - ciphernet
     depends_on:
@@ -62,10 +64,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
 
   # 4. Java BFF (Consumidor)
   java-bff:
