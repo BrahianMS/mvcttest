@@ -1,81 +1,70 @@
-import { useState, useEffect  } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../../utils/store/themeContext';
 import { useTranslation } from 'react-i18next';
 
-
 export default function HomePage() {
-
-  const API_URL = import.meta.env.VITE_API_URL as string;
-  const { theme, toggleTheme, mode } = useTheme();
+  // ✅ Fallback por si no está definida
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api/v1';
+  
+  const { theme } = useTheme();
   const { i18n, t } = useTranslation();
-  const [scrollY, setScrollY] = useState(0);
 
-  const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es');
+  //////////////////
+  // HOOKS / Tests the Api MVCT
+  const [message, setMessage] = useState("");
+  const [responseMessage, setResponseMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Test function
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+        credentials: "include"  
+      });
+
+      const data = await res.json();
+      setResponseMessage(data.message || JSON.stringify(data));
+    } catch (err) {
+      console.error(err);
+      setResponseMessage("❌ Error al publicar");
+    }
+
+    setLoading(false);
   };
-/////////////////
-  //HOOKS / Tests the Api MVCT
-    const [message, setMessage] = useState("");
-    const [responseMessage, setResponseMessage] = useState("");
-    const [loading, setLoading] = useState(false);
- // Test function
- const sendMessage = async () => {
-  if (!message.trim()) return;
 
-  setLoading(true);
+  const [healthStatus, setHealthStatus] = useState("");
 
-  try {
-   const res = await fetch(`${API_URL}/publish`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ message }),
-  credentials: "include"  
-});
-
-
-    const data = await res.json();
-    setResponseMessage(data.message);
-  } catch (err) {
-    console.error(err);
-    setResponseMessage("Error al publicar");
-  }
-
-  setLoading(false);
-};
-const [healthStatus, setHealthStatus] = useState("");
-
-useEffect(() => {
-  fetch(`${API_URL}/health`)
-    .then(res => res.json())
-    .then(data => setHealthStatus(data.status))
-    .catch(() => setHealthStatus("Error"));
-}, []);
-
-useEffect(() => {
-  const interval = setInterval(() => {
-    fetch(`${API_URL}/last`)
+  useEffect(() => {
+    fetch(`${API_URL}/health`)
       .then(res => res.json())
-      .then(data => {
-        if (data.message) {
-          setResponseMessage(data.message);
-        }
-      })
-      .catch(() => console.log("Error obteniendo mensaje"));
-  }, 1000);
+      .then(data => setHealthStatus(data.status))
+      .catch(() => setHealthStatus("Error"));
+  }, [API_URL]);
 
-  return () => clearInterval(interval);
-}, []);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch(`${API_URL}/last`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.message) {
+            setResponseMessage(data.message);
+          }
+        })
+        .catch(() => console.log("Error obteniendo mensaje"));
+    }, 1000);
 
-
-/////////////////////////
-
-
-
+    return () => clearInterval(interval);
+  }, [API_URL]);
 
   return (
     <>
-
-
       {/* Hero Section */}
       <section style={{
         display: 'grid',
@@ -165,105 +154,103 @@ useEffect(() => {
         </div>
       </section>
 
-     {/* Tagline Section */}
-<section
-  style={{
-    textAlign: "center",
-    padding: "60px 40px",
-    backgroundColor: "transparent",
-    backgroundImage: `linear-gradient(180deg, transparent 0%, ${theme.colors.surface}40 100%)`,
-    fontFamily: "inherit", // <-- misma fuente del resto de la app
-  }}
->
-  <h2
-    style={{
-      fontSize: "56px",
-      fontWeight: "bold",
-      lineHeight: "1.3",
-      marginBottom: "20px",
-    }}
-  >
-    {t("tagline.part1")}
-    <br />
-    <span style={{ color: theme.colors.primary }}>
-      {t("tagline.highlight1")}
-    </span>
-    <br />
-    {t("tagline.part2")}{" "}
-    <span style={{ color: theme.colors.primary }}>
-      {t("tagline.highlight2")}
-    </span>
-  </h2>
+      {/* Tagline Section */}
+      <section
+        style={{
+          textAlign: "center",
+          padding: "60px 40px",
+          backgroundColor: "transparent",
+          backgroundImage: `linear-gradient(180deg, transparent 0%, ${theme.colors.surface}40 100%)`,
+          fontFamily: "inherit",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "56px",
+            fontWeight: "bold",
+            lineHeight: "1.3",
+            marginBottom: "20px",
+          }}
+        >
+          {t("tagline.part1")}
+          <br />
+          <span style={{ color: theme.colors.primary }}>
+            {t("tagline.highlight1")}
+          </span>
+          <br />
+          {t("tagline.part2")}{" "}
+          <span style={{ color: theme.colors.primary }}>
+            {t("tagline.highlight2")}
+          </span>
+        </h2>
 
-  {/* INPUT + BUTTON */}
-  <div style={{ marginTop: "40px" }}>
-    <input
-      type="text"
-      value={message}
-      onChange={(e) => setMessage(e.target.value)}
-      placeholder="Escribe un mensaje..."
-      style={{
-        padding: "14px 18px",
-        fontSize: "20px", // <-- igual al estilo grande del tagline
-        fontWeight: "500",
-        width: "380px",
-        marginRight: "12px",
-        borderRadius: "12px",
-        border: `2px solid ${theme.colors.border}`,
-        backgroundColor: theme.colors.surface,
-        color: theme.colors.text.primary,
-        fontFamily: "inherit", // <-- misma fuente del título
-      }}
-    />
+        {/* INPUT + BUTTON */}
+        <div style={{ marginTop: "40px" }}>
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Escribe un mensaje..."
+            style={{
+              padding: "14px 18px",
+              fontSize: "20px",
+              fontWeight: "500",
+              width: "380px",
+              marginRight: "12px",
+              borderRadius: "12px",
+              border: `2px solid ${theme.colors.border}`,
+              backgroundColor: theme.colors.surface,
+              color: theme.colors.text.primary,
+              fontFamily: "inherit",
+            }}
+          />
 
-    <button
-      onClick={sendMessage}
-      style={{
-        backgroundColor: theme.colors.primary,
-        color: "#fff",
-        padding: "14px 28px",
-        borderRadius: "12px",
-        border: "none",
-        cursor: "pointer",
-        fontWeight: "bold",
-        fontSize: "20px",
-        fontFamily: "inherit",
-        transition: "0.2s",
-      }}
-    >
-      {loading ? "Enviando..." : "Enviar mensaje"}
-    </button>
-  </div>
+          <button
+            onClick={sendMessage}
+            style={{
+              backgroundColor: theme.colors.primary,
+              color: "#fff",
+              padding: "14px 28px",
+              borderRadius: "12px",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+              fontSize: "20px",
+              fontFamily: "inherit",
+              transition: "0.2s",
+            }}
+          >
+            {loading ? "Enviando..." : "Enviar mensaje"}
+          </button>
+        </div>
 
+        {/* RESPUESTA DEL POST */}
+        {responseMessage && (
+          <p
+            style={{
+              marginTop: "20px",
+              fontSize: "20px",
+              color: theme.colors.text.primary,
+            }}
+          >
+            <span style={{ color: theme.colors.primary }}>POST: </span>{responseMessage}
+          </p>
+        )}
 
-  {/* RESPUESTA DEL POST */}
-  {responseMessage && (
-    <p
-      style={{
-        marginTop: "20px",
-        fontSize: "20px",
-        color: theme.colors.text.primary,
-      }}
-    >
-       <span style={{ color: theme.colors.primary }}>POST: </span>{responseMessage}
-    </p>
-  )}
-
-  {/* GET HEALTH */}
-  {healthStatus && (
-    <p
-      style={{
-        marginTop: "20px",
-        fontSize: "20px",
-        fontWeight: "600",
-        color: theme.colors.text.primary,
-      }}
-    >
-      <span style={{ color: theme.colors.primary }}>GET: </span> health: {healthStatus}
-    </p>
-  )}
-</section>
-
+        {/* GET HEALTH */}
+        {healthStatus && (
+          <p
+            style={{
+              marginTop: "20px",
+              fontSize: "20px",
+              fontWeight: "600",
+              color: theme.colors.text.primary,
+            }}
+          >
+            <span style={{ color: theme.colors.primary }}>GET: </span> health: {healthStatus}
+          </p>
+        )}
+      </section>
 
       {/* Services Section */}
       <section style={{
