@@ -3,7 +3,8 @@ package com.mvct.demo.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
-
+import io.hypersistence.utils.hibernate.type.json.JsonType;
+import org.hibernate.annotations.Type;
 @Entity
 @Table(name = "connectivity_log")
 public class ConnectivityLog {
@@ -12,12 +13,11 @@ public class ConnectivityLog {
     @GeneratedValue
     private UUID id;
 
+    @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
-    private String message;
+    private Object message;   
 
     private LocalDateTime receivedAt = LocalDateTime.now();
-
-    // GETTERS Y SETTERS
 
     public UUID getId() {
         return id;
@@ -27,11 +27,11 @@ public class ConnectivityLog {
         this.id = id;
     }
 
-    public String getMessage() {
+    public Object getMessage() {
         return message;
     }
 
-    public void setMessage(String message) {
+    public void setMessage(Object message) {  // <-- OK
         this.message = message;
     }
 

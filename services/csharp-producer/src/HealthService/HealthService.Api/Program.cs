@@ -15,7 +15,7 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // ✅ CORS configurado desde variables de entorno
 var allowedOrigins = builder.Configuration["CORS_ORIGINS"]?.Split(',') 
-    ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+    ?? new[] { "http://localhost:5173", "http://localhost:3000", "http://localhost" };
 
 builder.Services.AddCors(options =>
 {
@@ -36,7 +36,7 @@ var app = builder.Build();
 
 app.UseCors("AllowFrontend");
 
-// ✅ HEALTH CHECK MEJORADO
+// ✅ HEALTH CHECK MEJORADO - Ruta correcta
 app.MapGet("/api/v1/health", (ILogger<Program> logger) => 
 {
     try
@@ -87,6 +87,7 @@ app.MapPost("/api/v1/publish", async (PublishRequest req, IEventBus bus, ILogger
     }
 });
 
+// ✅ Endpoint para obtener último mensaje
 app.MapGet("/api/v1/last", () =>
 {
     return Results.Json(new
@@ -94,5 +95,8 @@ app.MapGet("/api/v1/last", () =>
         message = MessageStore.LastMessage
     });
 });
+
+// ✅ Agregar endpoint raíz para pruebas
+app.MapGet("/", () => "CipherAudit C# Producer - Online ✅");
 
 app.Run();

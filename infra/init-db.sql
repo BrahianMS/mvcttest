@@ -1,7 +1,7 @@
 -- ✅ Tabla mejorada con índices
 CREATE TABLE IF NOT EXISTS connectivity_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id VARCHAR(100) UNIQUE NOT NULL,
+    event_id VARCHAR(100) UNIQUE,
     message JSONB NOT NULL,
     received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

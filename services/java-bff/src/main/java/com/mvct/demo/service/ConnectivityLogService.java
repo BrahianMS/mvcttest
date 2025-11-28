@@ -12,17 +12,14 @@ import com.mvct.demo.repository.ConnectivityLogRepository;
 public class ConnectivityLogService {
 
     @Autowired
-    private ConnectivityLogRepository repository;
+    private ConnectivityLogRepository repository;   // <-- FALTABA ESTO
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper objectMapper;
 
     public void save(TestPingMessage msg) {
         ConnectivityLog log = new ConnectivityLog();
-        try {
-            log.setMessage(mapper.writeValueAsString(msg));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        log.setMessage(msg);  // <-- YA FUNCIONA, se guarda como JSONB
         repository.save(log);
     }
 }

@@ -1,11 +1,24 @@
 package com.mvct.demo.dto;
 
-// ✅ Alineado con MessagePublishedEvent de C#
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class TestPingMessage {
-    private String eventId;    // era "eventId" ✅
-    private String timestamp;  // era "timestamp" ✅
-    private String tenantId;   // era "tenantId" ✅
-    private String message;    // ✅ Nuevo campo
+    
+    @JsonProperty("eventId")
+    private String eventId;
+    
+    @JsonProperty("timestamp")
+    private String timestamp;
+    
+    @JsonProperty("tenantId")
+    private String tenantId;
+    
+    @JsonProperty("message")
+    private String message;
+
+    // Constructor vacío (necesario para Jackson)
+    public TestPingMessage() {
+    }
 
     // Getters y Setters
     public String getEventId() {
