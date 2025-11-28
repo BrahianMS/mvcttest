@@ -1,0 +1,30 @@
+_meta:
+  tag: mvct-v0.5
+
+services:
+- name: csharp-api-service
+  url: http://csharp-producer:8080 # CRÍTICO: Nombre del servicio Docker
+  routes:
+  - name: api-route
+    paths:
+    - /api/v1
+    plugins:
+    # --- Plugin de Autenticación OIDC (Auth0) ---
+    - name: "openid-connect"
+      config:
+        issuer: "${AUTH0_ISSUER}" # Desde .env
+        client_id: "${AUTH0_CLIENT_ID}" # Desde .env
+        client_secret: "${AUTH0_CLIENT_SECRET}" # Desde .env
+        # Configuración mínima para JWT validación
+        realm: "CipherAudit API"
+        auth_methods: "bearer"
+        # Otras configuraciones de token...
+        
+- name: frontend-service
+  url: http://sentinel-front:3000 # CRÍTICO: Nombre del servicio Docker y puerto
+  routes:
+  - name: frontend-route
+    paths:
+    - /
+    strip_path: false # No remueve el path
+    
