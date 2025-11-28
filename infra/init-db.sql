@@ -1,10 +1,18 @@
+-- ✅ Tabla mejorada con índices
 CREATE TABLE IF NOT EXISTS connectivity_log (
-    event_id UUID PRIMARY KEY,
-    status VARCHAR(50) DEFAULT 'PENDING',
-    csharp_timestamp TIMESTAMP WITH TIME ZONE,
-    java_timestamp TIMESTAMP WITH TIME ZONE,
-    event_type VARCHAR(100),
-    source_ip VARCHAR(45),
-    payload JSONB,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id VARCHAR(100) UNIQUE NOT NULL,
+    message JSONB NOT NULL,
+    received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ✅ Índices para consultas rápidas
+CREATE INDEX IF NOT EXISTS idx_connectivity_log_event_id ON connectivity_log(event_id);
+CREATE INDEX IF NOT EXISTS idx_connectivity_log_received_at ON connectivity_log(received_at DESC);
+
+-- ✅ Log de creación
+DO $$
+BEGIN
+    RAISE NOTICE '✅ Tabla connectivity_log creada correctamente';
+END $$;

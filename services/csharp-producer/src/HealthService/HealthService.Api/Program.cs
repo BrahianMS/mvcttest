@@ -6,63 +6,71 @@ using HealthService.Api.Contracts;
 using HealthService.Application;
 using HealthService.Api.Storage;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-// CORS — SIEMPRE ANTES DE app.Build()
+// ✅ Logging mejorado
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
+// ✅ CORS configurado desde variables de entorno
+var allowedOrigins = builder.Configuration["CORS_ORIGINS"]?.Split(',') 
+    ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
-// -----------------------------------------
-// REGISTRO DE SERVICIOS
-// -----------------------------------------
-builder.Services.AddInfrastructureServices();
+
+// ✅ Registro de servicios
+builder.Services.AddInfrastructureServices(); // Ahora usa RabbitMQEventBus
 builder.Services.AddApplicationServices();
-
-
 
 var app = builder.Build();
 
-// -----------------------------------------
-// MIDDLEWARES
-// -----------------------------------------
 app.UseCors("AllowFrontend");
 
-// -----------------------------------------
-// EVENT BUS
-// -----------------------------------------
-var eventBus = app.Services.GetRequiredService<IEventBus>();
+// ✅ Event Bus - Eliminar suscripción (no se usa en productor)
+// El consumer Java manejará el consumo
 
-eventBus.Subscribe<MessagePublishedEvent>(async (evt) =>
+// ✅ ENDPOINTS
+app.MapPost("/publish", async (PublishRequest req, IEventBus bus, ILogger<Program> logger) =>
 {
-    var handler = new MessagePublishedEventHandler();
-    await handler.HandleAsync(evt);
-});
-
-// -----------------------------------------
-// ENDPOINTS
-// -----------------------------------------
-app.MapPost("/publish", async (PublishRequest req, IEventBus bus) =>
-{
-    var evt = new MessagePublishedEvent(Guid.NewGuid(), DateTime.UtcNow, req.Message);
-    await bus.PublishAsync(evt);
-
-    // Guardar el último mensaje
-    MessageStore.LastMessage = req.Message;
-
-    return Results.Ok(new
+    try
     {
-        published = true,
-        evt.Id,
-        evt.Message
-    });
+        var evt = new MessagePublishedEvent(
+            EventId: Guid.NewGuid().ToString(),
+            Timestamp: DateTime.UtcNow.ToString("o"), // ISO 8601
+            TenantId: "default-tenant",
+            Message: req.Message
+        );
+        
+        await bus.PublishAsync(evt);
+        MessageStore.LastMessage = req.Message;
+
+        logger.LogInformation("✅ Mensaje publicado: {EventId}", evt.EventId);
+
+        return Results.Accepted("/publish", new
+        {
+            published = true,
+            eventId = evt.EventId,
+            message = evt.Message,
+            timestamp = evt.Timestamp
+        });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Error publicando mensaje");
+        return Results.Problem("Error al publicar mensaje");
+    }
 });
+
 app.MapGet("/last", () =>
 {
     return Results.Json(new
@@ -71,8 +79,10 @@ app.MapGet("/last", () =>
     });
 });
 
+app.MapGet("/health", (ILogger<Program> logger) => 
+{
+    logger.LogInformation("💚 Health check OK");
+    return Results.Json(new { status = "Healthy", service = "csharp-producer" });
+});
 
-app.MapGet("/health", () => Results.Json(new { status = "Eche" }));
-
-// -----------------------------------------
 app.Run();

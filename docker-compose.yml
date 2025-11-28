@@ -4,20 +4,20 @@ services:
     image: postgres:16-alpine
     container_name: cipheraudit-postgres
     environment:
-      POSTGRES_DB: cipheraudit
-      POSTGRES_USER: cipher
-      POSTGRES_PASSWORD: SuperSecret123!
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - ciphernet
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 20s
 
   # 2. Broker de Mensajería (RabbitMQ)
   rabbitmq:
@@ -33,10 +33,10 @@ services:
       - ciphernet
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 5
-      start_period: 15s
+      start_period: 30s
 
   # 3. Microservicio C# (Productor)
   csharp-producer:
@@ -44,11 +44,17 @@ services:
     container_name: cipheraudit-csharp
     environment:
       ASPNETCORE_URLS: "http://+:8080"
+      ASPNETCORE_ENVIRONMENT: "Production"
       DB_HOST: "postgres"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
       RMQ_HOST: "rabbitmq"
+      RMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
+      CORS_ORIGINS: ${CORS_ORIGINS}
     networks:
       - ciphernet
-    # Depende de que las infraestructuras estén sanas
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -56,10 +62,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 3
-      start_period: 40s # Permite tiempo para la compilación JIT
+      start_period: 60s
 
   # 4. Java BFF (Consumidor)
   java-bff:
@@ -68,8 +74,12 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: "postgres"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
       RMQ_HOST: "rabbitmq"
-    # LÓGICA DE ESPERA EN SHELL CRÍTICA
+      RMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
     command: >
       sh -c "
       until nc -z rabbitmq 5672 && nc -z postgres 5432; 
@@ -78,7 +88,6 @@ services:
       java -jar /app/app.jar"
     networks:
       - ciphernet
-    # Dependencia lógica para el orquestador
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -86,48 +95,51 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
-  # 5. Frontend React (Nginx-Free 'serve')
+  # 5. Frontend React
   sentinel-front:
-    build: ./services/sentinel-front
+    build: 
+      context: ./services/sentinel-front
+      args:
+        VITE_API_URL: ${VITE_API_URL}
     container_name: cipheraudit-frontend
     networks:
       - ciphernet
-    # Solo dependencia lógica (el front debe cargar)
     depends_on:
       java-bff:
         condition: service_healthy
-    # El puerto 3000 fue definido en el Dockerfile de 'serve'
 
   # 6. API Gateway (Kong Declarativo)
   kong:
     image: kong:3.6.0
     container_name: cipheraudit-kong
     environment:
-      KONG_DATABASE: "off" # Modo Declarativo sin DB
+      KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
       KONG_PROXY_LISTEN: 0.0.0.0:8000
       KONG_ADMIN_LISTEN: 127.0.0.1:8001
+      KONG_LOG_LEVEL: debug
     volumes:
       - ./infra/kong/declarative:/kong/declarative
     ports:
-      - "80:8000" # TRÁFICO EXTERNO
-      # Eliminamos el puerto admin expuesto para seguridad
+      - "80:8000"
     networks:
       - ciphernet
-    # CRÍTICO: Kong se inicia primero. No depende de los backends.
-    depends_on: 
-      rabbitmq: # Incluimos RabbitMQ porque el Health Check de Kong podría usarlo
+    depends_on:
+      csharp-producer:
         condition: service_healthy
+      sentinel-front:
+        condition: service_started
     healthcheck:
       test: ["CMD", "kong", "health"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 5
+      start_period: 30s
 
 networks:
   ciphernet:

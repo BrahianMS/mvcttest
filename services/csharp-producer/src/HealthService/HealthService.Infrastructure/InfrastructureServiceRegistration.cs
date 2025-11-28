@@ -7,7 +7,9 @@ public static class InfrastructureServiceRegistration
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
-        services.AddSingleton<IEventBus, InMemoryEventBus>();
+        // ✅ Cambio: Usar RabbitMQEventBus en lugar de InMemoryEventBus
+        services.AddSingleton<IEventBus, RabbitMQEventBus>();
+        
         return services;
     }
 }

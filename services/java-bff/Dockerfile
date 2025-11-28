@@ -1,16 +1,35 @@
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jdk-alpine AS builder
 
 WORKDIR /app
 
-ARG JAR_FILE=target/demo-0.0.1-SNAPSHOT.jar
-COPY ${JAR_FILE} app.jar
 
-# Perfil para usar application-docker.yml
+COPY pom.xml .
+COPY mvnw .
+COPY .mvn .mvn
+
+
+RUN chmod +x mvnw
+
+
+RUN ./mvnw dependency:go-offline -B
+
+
+COPY src src
+
+
+RUN ./mvnw clean package -DskipTests
+
+
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+
+COPY --from=builder /app/target/*.jar app.jar
+
+
 ENV SPRING_PROFILES_ACTIVE=docker
 
-# Puerto interno de la app Spring Boot
 EXPOSE 8080
 
-ENTRYPOINT ["java","-jar","/app/app.jar"]
-
-
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
